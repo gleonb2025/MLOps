@@ -20,3 +20,5 @@ variables:
   # For pipeline reference
   resource_group: MLS-RG-NEW
   aml_workspace: MLS-workspace-new
+
+  #end
