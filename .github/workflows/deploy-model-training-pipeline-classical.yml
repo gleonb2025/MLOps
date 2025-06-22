@@ -1,4 +1,3 @@
-#workflow name
 name: MLOps Pipeline # Name of your workflow
 
 #Trigger events
