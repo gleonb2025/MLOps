@@ -1,44 +1,74 @@
-name: MLOps Pipeline # Name of your workflow
+name: Full MLOps Pipeline
 
-#Trigger events
 on:
- push:
- branches:
- - main
- pull_request:
- branches:
- - main
- workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
 
-
-#set up environments
 jobs:
- setup-environment:
- runs-on: ubuntu-latest
- steps:
- - name: Checkout Code
- uses: actions/checkout@v3
-- name: Set up Python
- uses: actions/setup-python@v4
- with:
- python-version: 3.9
-- name: Install Dependencies
- run: |
- python -m pip install --upgrade pip
- pip install -r requirements.txt
+  setup:
+    runs-on: ubuntu-latest
+    # expose these to downstream jobs
+    outputs:
+      RESOURCE_GROUP: ${{ steps.parse.outputs.RESOURCE_GROUP }}
+      AML_WORKSPACE:   ${{ steps.parse.outputs.AML_WORKSPACE }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-#Train model
- train-model:
- runs-on: ubuntu-latest
- needs: setup-environment
- steps:
- - name: Train Model
- run: python train_model.py
-  - name: Save Model Artifact
- uses: actions/upload-artifact@v3
- with:
- name: trained-model
- path: models/
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Set up Python for YAML parsing
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
+      - name: Install PyYAML
+        run: python -m pip install pyyaml
 
+      - name: Parse config-infra-prod.yml
+        id: parse
+        run: |
+          python - << 'EOF'
+import os, yaml
+# Load your prod config (with RG & workspace placeholders) :contentReference[oaicite:0]{index=0}
+cfg = yaml.safe_load(open('MLOps/Azure-mlops-CICD-pipeline-main/config-infra-prod.yml'))
+vars = cfg.get('variables', {})
+# Write them to GITHUB_OUTPUT so later jobs can consume
+with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+    out.write(f"RESOURCE_GROUP={vars['resource_group']}\n")
+    out.write(f"AML_WORKSPACE={vars['aml_workspace']}\n")
+EOF
+
+  train-model:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Submit Training Pipeline
+        run: |
+          az ml job create \
+            --file MLOps/Azure-mlops-CICD-pipeline-main/train-pipeline-prod.yml \
+            --resource-group ${{ needs.setup.outputs.RESOURCE_GROUP }} \
+            --workspace-name ${{ needs.setup.outputs.AML_WORKSPACE }}
+
+  deploy-infra:
+    needs: train-model
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Submit Infra & Integration Pipeline
+        run: |
+          az ml job create \
+            --file MLOps/Azure-mlops-CICD-pipeline-main/config-infra-prod.yml \
+            --resource-group ${{ needs.setup.outputs.RESOURCE_GROUP }} \
+            --workspace-name ${{ needs.setup.outputs.AML_WORKSPACE }}
