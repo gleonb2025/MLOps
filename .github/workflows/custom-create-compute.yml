@@ -1,77 +1,101 @@
 name: create-compute
 
-on: 
+on:
   workflow_call:
     inputs:
       cluster_name:
         required: true
         type: string
-      size:  
+      size:
         required: true
         type: string
-      min_instances: 
+      min_instances:
         required: true
         type: number
-      max_instances: 
+      max_instances:
         required: true
         type: number
-      resource_group:   
+      resource_group:
         required: true
         type: string
-      workspace_name:  
+      workspace_name:
         required: true
         type: string
-      cluster_tier: 
+      cluster_tier:
         required: false
         type: string
     secrets:
       creds:
+        required: true
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_CLIENT_SECRET:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
         required: true
 
 jobs:
   create-compute:
     runs-on: ubuntu-latest
     steps:
-      - name: Az CLI login
+
+      - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.creds }}
 
-      - name: Ensure Azure ML CLI extension is correct
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Azure ML Python SDK
         run: |
-          # Remove any conflicting extensions
-          az extension remove -n azure-cli-ml || true
-          az extension remove -n ml             || true
+          python -m pip install --upgrade pip
+          pip install azure-ai-ml azure-identity
 
-          # Install the official 'ml' extension from the marketplace
-          az extension add -n ml
-
-          # Confirm only the 'ml' extension is active
-          az extension list --output table
-
-      - name: create-compute-default-tier
-        if: ${{ inputs.cluster_tier == '' }}
+      - name: Create compute via Python SDK
+        env:
+          AZURE_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
-          az ml compute create \
-            --name           "${{ inputs.cluster_name }}" \
-            --type           AmlCompute \
-            --tier           dedicated \
-            --size           "${{ inputs.size }}" \
-            --min-instances  "${{ inputs.min_instances }}" \
-            --max-instances  "${{ inputs.max_instances }}" \
-            --resource-group "${{ inputs.resource_group }}" \
-            --workspace-name "${{ inputs.workspace_name }}"
+          python - << 'EOF'
+import os
+from azure.identity import ClientSecretCredential
+from azure.ai.ml import MLClient
+from azure.ai.ml.entities import AmlCompute
 
-      - name: create-compute-using-tier
-        if: ${{ inputs.cluster_tier != '' }}
-        run: |
-          az ml compute create \
-            --name           "${{ inputs.cluster_name }}" \
-            --type           AmlCompute \
-            --tier           "${{ inputs.cluster_tier }}" \
-            --size           "${{ inputs.size }}" \
-            --min-instances  "${{ inputs.min_instances }}" \
-            --max-instances  "${{ inputs.max_instances }}" \
-            --resource-group "${{ inputs.resource_group }}" \
-            --workspace-name "${{ inputs.workspace_name }}"
-            
+# Authentication
+cred = ClientSecretCredential(
+    tenant_id=os.environ["AZURE_TENANT_ID"],
+    client_id=os.environ["AZURE_CLIENT_ID"],
+    client_secret=os.environ["AZURE_CLIENT_SECRET"],
+)
+
+ml_client = MLClient(
+    credential=cred,
+    subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
+    resource_group_name="${{ inputs.resource_group }}",
+    workspace_name="${{ inputs.workspace_name }}",
+)
+
+# Choose tier (default 'dedicated')
+tier = "${{ inputs.cluster_tier }}" or "dedicated"
+
+compute = AmlCompute(
+    name="${{ inputs.cluster_name }}",
+    size="${{ inputs.size }}",
+    min_instances=${{ inputs.min_instances }},
+    max_instances=${{ inputs.max_instances }},
+    tier=tier
+)
+
+# Create or update the compute target
+ml_client.begin_create_or_update(compute).result()
+
+print(f"✅ Compute '{compute.name}' created (tier: {tier})")
+EOF
