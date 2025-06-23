@@ -1,4 +1,4 @@
-name: create-compute
+name: create-compute         # workflow name
 
 on:
   workflow_call:
@@ -40,7 +40,6 @@ jobs:
   create-compute:
     runs-on: ubuntu-latest
     steps:
-
       - name: Azure Login
         uses: azure/login@v1
         with:
@@ -69,23 +68,21 @@ from azure.identity import ClientSecretCredential
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import AmlCompute
 
-# Authentication
+# Authenticate
 cred = ClientSecretCredential(
     tenant_id=os.environ["AZURE_TENANT_ID"],
     client_id=os.environ["AZURE_CLIENT_ID"],
     client_secret=os.environ["AZURE_CLIENT_SECRET"],
 )
 
-ml_client = MLClient(
-    credential=cred,
+ml = MLClient(
+    cred,
     subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
     resource_group_name="${{ inputs.resource_group }}",
-    workspace_name="${{ inputs.workspace_name }}",
+    workspace_name="${{ inputs.workspace_name }}"
 )
 
-# Choose tier (default 'dedicated')
 tier = "${{ inputs.cluster_tier }}" or "dedicated"
-
 compute = AmlCompute(
     name="${{ inputs.cluster_name }}",
     size="${{ inputs.size }}",
@@ -94,8 +91,6 @@ compute = AmlCompute(
     tier=tier
 )
 
-# Create or update the compute target
-ml_client.begin_create_or_update(compute).result()
-
-print(f"✅ Compute '{compute.name}' created (tier: {tier})")
+ml.begin_create_or_update(compute).result()
+print(f"Compute '{compute.name}' created (tier {tier})")
 EOF
