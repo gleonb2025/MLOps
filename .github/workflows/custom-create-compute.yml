@@ -37,20 +37,17 @@ jobs:
         with:
           creds: ${{ secrets.creds }}
 
-      - name: Block legacy ML extension
+      - name: Ensure Azure ML CLI extension is correct
         run: |
-          az extension remove -n ml            || true
-          az extension remove -n azure-cli-ml  || true
-          az config set extension.dynamic_install_no_warn=true
-          az config set extension.dynamic_install_allow_preview=false
+          # Remove any conflicting extensions
+          az extension remove -n azure-cli-ml || true
+          az extension remove -n ml             || true
 
-      - name: Install azure-cli-ml via pip
-        run: |
-          pip install --upgrade azure-cli-ml
-          az extension list --query "[?name=='azure-cli-ml']"
+          # Install the official 'ml' extension from the marketplace
+          az extension add -n ml
 
-      - name: ensure no stray “ml” stub
-        run: az extension remove -n ml || true
+          # Confirm only the 'ml' extension is active
+          az extension list --output table
 
       - name: create-compute-default-tier
         if: ${{ inputs.cluster_tier == '' }}
@@ -77,3 +74,4 @@ jobs:
             --max-instances  "${{ inputs.max_instances }}" \
             --resource-group "${{ inputs.resource_group }}" \
             --workspace-name "${{ inputs.workspace_name }}"
+            
