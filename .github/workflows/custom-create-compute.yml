@@ -1,4 +1,4 @@
-name: create-compute         # workflow name
+name: create-compute         # ← added the missing “n” here
 
 on:
   workflow_call:
@@ -63,34 +63,34 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           python - << 'EOF'
-import os
-from azure.identity import ClientSecretCredential
-from azure.ai.ml import MLClient
-from azure.ai.ml.entities import AmlCompute
+            import os
+            from azure.identity import ClientSecretCredential
+            from azure.ai.ml import MLClient
+            from azure.ai.ml.entities import AmlCompute
 
-# Authenticate
-cred = ClientSecretCredential(
-    tenant_id=os.environ["AZURE_TENANT_ID"],
-    client_id=os.environ["AZURE_CLIENT_ID"],
-    client_secret=os.environ["AZURE_CLIENT_SECRET"],
-)
+            # Authenticate
+            cred = ClientSecretCredential(
+                tenant_id=os.environ["AZURE_TENANT_ID"],
+                client_id=os.environ["AZURE_CLIENT_ID"],
+                client_secret=os.environ["AZURE_CLIENT_SECRET"],
+            )
 
-ml = MLClient(
-    cred,
-    subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
-    resource_group_name="${{ inputs.resource_group }}",
-    workspace_name="${{ inputs.workspace_name }}"
-)
+            ml = MLClient(
+                cred,
+                subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
+                resource_group_name="${{ inputs.resource_group }}",
+                workspace_name="${{ inputs.workspace_name }}"
+            )
 
-tier = "${{ inputs.cluster_tier }}" or "dedicated"
-compute = AmlCompute(
-    name="${{ inputs.cluster_name }}",
-    size="${{ inputs.size }}",
-    min_instances=${{ inputs.min_instances }},
-    max_instances=${{ inputs.max_instances }},
-    tier=tier
-)
+            tier = "${{ inputs.cluster_tier }}" or "dedicated"
+            compute = AmlCompute(
+                name="${{ inputs.cluster_name }}",
+                size="${{ inputs.size }}",
+                min_instances=${{ inputs.min_instances }},
+                max_instances=${{ inputs.max_instances }},
+                tier=tier
+            )
 
-ml.begin_create_or_update(compute).result()
-print(f"Compute '{compute.name}' created (tier {tier})")
-EOF
+            ml.begin_create_or_update(compute).result()
+            print(f"Compute '{compute.name}' created (tier {tier})")
+          EOF
