@@ -57,16 +57,11 @@ jobs:
       - name: update-extension
         run: az extension update -n ml
 
-      - name: Ensure ML extension is up-to-date
-        run: |
-          az extension remove -n ml || true
-          az extension add -n ml
-
-      
       - name: create-compute-default-tier
         if: ${{ inputs.cluster_tier == '' }}
         run: |
           az ml compute create --name "${{ inputs.cluster_name }}" \
+            --api-version 2025-04-01 \
             --type AmlCompute \
             --tier dedicated \
             --size "${{ inputs.size }}" \
@@ -79,6 +74,7 @@ jobs:
         if: ${{ inputs.cluster_tier != '' }}
         run: |
           az ml compute create --name "${{ inputs.cluster_name }}" \
+            --api-version 2025-04-01 \
             --type AmlCompute \
             --tier "${{ inputs.cluster_tier }}" \
             --size "${{ inputs.size }}" \
