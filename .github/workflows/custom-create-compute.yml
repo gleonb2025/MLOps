@@ -57,12 +57,18 @@ jobs:
       - name: update-extension
         run: az extension update -n ml
 
+      - name: Ensure Azure ML CLI extension is latest
+        run: |
+          # remove any old ML extension
+          az extension remove -n ml || true
+          # install the ML extension (this pulls the latest supported API)
+          az extension add -n ml
+
       - name: create-compute-default-tier
         if: ${{ inputs.cluster_tier == '' }}
         run: |
           az ml compute create --name "${{ inputs.cluster_name }}" \
-            --api-version 2025-04-01 \
-            --type AmlCompute \
+             --type AmlCompute \
             --tier dedicated \
             --size "${{ inputs.size }}" \
             --min-instances "${{ inputs.min_instances }}" \
@@ -74,7 +80,6 @@ jobs:
         if: ${{ inputs.cluster_tier != '' }}
         run: |
           az ml compute create --name "${{ inputs.cluster_name }}" \
-            --api-version 2025-04-01 \
             --type AmlCompute \
             --tier "${{ inputs.cluster_tier }}" \
             --size "${{ inputs.size }}" \
