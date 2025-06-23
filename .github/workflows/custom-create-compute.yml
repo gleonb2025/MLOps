@@ -56,6 +56,12 @@ jobs:
         run:  az extension add -n ml -y
       - name: update-extension
         run: az extension update -n ml
+
+      - name: Ensure ML extension is up-to-date
+        run: |
+          az extension remove -n ml || true
+          az extension add -n ml
+
       
       - name: create-compute-default-tier
         if: ${{ inputs.cluster_tier == '' }}
