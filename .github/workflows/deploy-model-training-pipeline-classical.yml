@@ -70,8 +70,8 @@ jobs:
       uses: ./.github/workflows/custom-run-pipeline.yml
       with:
         resource_group: ${{ needs.get-config.outputs.resource_group }}
-        workspace_name: ${{ needs.get-config.outputs.aml_workspace }}     
-        parameters-file:  mlops/azureml/train/newpipeline.yml
+        workspace_name: ${{ needs.get-config.outputs.aml_workspace }} 
+        parameters-file:  Azure-mlops-CICD-pipeline-main/mlops/azureml/train/newpipeline.yml
         job-name: mlops-pipeline
       # secrets:
       #   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
